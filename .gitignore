@@ -2,3 +2,8 @@
 .swiftpm/
 *.xcodeproj
 .DS_Store
+
+# Web / Node
+web/node_modules/
+web/dist/
+*.local

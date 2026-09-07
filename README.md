@@ -1,95 +1,108 @@
 # LiquidGlassKit 💧✨
 
 > **Apple-style Liquid Glass Lens Refraction with Optical Inversion, 6-Tap Spectral Dispersion, and macOS Desktop WindowServer Penetration.**
-
-A production-grade Swift Package and Metal Shader engine delivering authentic physical glass refraction for **macOS** and **iOS**.
-
----
-
-## 🌟 Key Features
-
-1. **Desktop Floating Bubble (`NSPanel` + WindowServer)**
-   * Draggable floating bubble on the macOS desktop that floats above all apps.
-   * **Direct WindowServer hardware composition**: Real-time 120 FPS refraction over Safari, Xcode, Finder, and wallpaper.
-   * **Zero screen recording permissions required!**
-2. **True Optical Inversion & Dual Displacement Modes**
-   * **Mode A (`.opticalInversion`)**: High-curvature convex lens. The sampling map folds over itself, causing text underneath to invert upside down and horizontal dots to split into dual rows.
-   * **Mode B (`.foldFree`)**: Slope-clamped monotone mapping for readable UI controls (TabBars, buttons, segmented controls).
-3. **6-Tap Continuous Spectrum Dispersion**
-   * Smooth blue → cyan → magenta chromatic sheen along the rim contour, eliminating crude red/green banding.
-4. **20° Tangential Shear**
-   * Refraction rays sweep along the edge contour, giving the glass an organic, fluid-like surface tension.
-5. **iOS Squircle & Capsule Geometry**
-   * Continuous curvature distance fields ($p \approx 4.2$) avoiding sharp curvature breaks.
-6. **Built-in Antigravity / AI Skill**
-   * Ready-to-use `SKILL.md` in `skills/liquid-glass-lens/` so AI assistants can automatically generate and configure liquid glass components in any project.
+> 
+> Available for **Swift & Metal (macOS & iOS)** and **TypeScript & WebGL 2.0 (Web & Frontend)**.
 
 ---
 
-## 🚀 Quick Start & Live Desktop Demo
+## 🌟 Repository Structure
 
-Clone the repo and launch the desktop glass bubble immediately:
+This repository provides authentic physical liquid glass lens refraction across platforms:
 
-```bash
-git clone https://github.com/sqoder/LiquidGlassKit.git
-cd LiquidGlassKit
-swift run LiquidGlassDemo
+```
+LiquidGlassKit/
+├── Package.swift                 # Swift Package Manager manifest
+├── Sources/
+│   ├── LiquidGlassKit/          # Swift / Metal Core Library (macOS & iOS)
+│   │   ├── DesktopGlassBubble.swift   # WindowServer hardware penetration floating bubble
+│   │   ├── LiquidGlassModifier.swift  # SwiftUI ViewModifier (.liquidGlassLens)
+│   │   ├── LiquidGlassCard.swift      # Floating Dynamic Island Card container & Demo
+│   │   └── Shaders/LiquidGlassLens.metal # MSL Core Shader (SDF, Snell's Law, 6-Tap Dispersion)
+│   └── LiquidGlassDemo/         # Standalone native macOS Desktop executable
+├── web/                         # TypeScript + WebGL 2.0 implementation
+│   ├── src/
+│   │   ├── shaders.ts           # WebGL 2.0 GLSL Shaders (1:1 translation of Metal Shader)
+│   │   ├── LiquidGlassRenderer.ts # WebGL 2.0 rendering pipeline
+│   │   └── LiquidGlassLens.ts   # High-level TypeScript controller with drag support
+│   ├── index.html               # Interactive Web demo page
+│   └── package.json
+└── skills/
+    └── liquid-glass-lens/       # Antigravity / AI Agent Skill specification
 ```
 
-A crystal-clear liquid glass bubble will rise on your Mac desktop. Click and drag it over any open window to see real-time physical lens refraction and optical inversion!
-
 ---
 
-## 📦 Installation
+## 🍏 1. Swift & Metal (macOS / iOS)
 
-Add **LiquidGlassKit** via Swift Package Manager:
+### 🌟 Features
+* **Desktop Floating Bubble (`NSPanel` + WindowServer)**: Real-time 120 FPS hardware compositor penetration across all desktop windows with **ZERO screen recording permissions**.
+* **Optical Inversion**: High-curvature physical convex lens mode where the UV sampling map folds over itself, causing text underneath to invert upside down and horizontal dots to split into dual rows.
+* **Fold-Free Legible Mode**: Monotone slope clamping for readable UI controls (TabBar, buttons).
+* **6-Tap Continuous Spectrum Dispersion**: Smooth blue → cyan → magenta chromatic sheen.
+* **iOS Squircle Continuous Curvature**: Analytic distance field using p-norm ($p \approx 4.2$).
 
+### 🚀 Run the macOS Desktop Glass Bubble Demo
+```bash
+swift run LiquidGlassDemo
+```
+A crystal-clear liquid glass bubble will float on your Mac desktop. Click and drag it over any open window (Safari, Xcode, Finder, Wallpaper) to see real-time physical lens refraction and optical inversion!
+
+### 📦 Installation
 ```swift
 dependencies: [
     .package(url: "https://github.com/sqoder/LiquidGlassKit.git", from: "1.0.0")
 ]
 ```
 
----
-
-## 🛠 Usage Examples
-
-### 1. Launch a Real macOS Desktop Floating Bubble
-```swift
-import AppKit
-import LiquidGlassKit
-
-// Elevate a floating glass bubble on your Mac desktop
-DesktopGlassBubble.shared.show(size: 220)
-```
-
-### 2. Apply to Any In-App SwiftUI View
+### 🛠 Usage in SwiftUI
 ```swift
 import SwiftUI
 import LiquidGlassKit
 
-struct MyGlassCard: View {
-    var body: some View {
-        Text("Dynamic Island Card")
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 24).fill(.ultraThinMaterial))
-            // Apply authentic liquid glass lens effect
-            .liquidGlassLens(.opticalInversionPreset)
-    }
-}
+// 1. Launch a floating desktop bubble
+DesktopGlassBubble.shared.show(size: 220)
+
+// 2. Or apply to any in-app SwiftUI view
+MyCardView()
+    .liquidGlassLens(.opticalInversionPreset)
 ```
 
-### 3. Custom Optical Tuning
-```swift
-MyView()
-    .liquidGlassLens(
-        bezel: 18.0,              // Rim thickness in points
-        strength: 28.0,           // Refraction amplitude
-        mode: .opticalInversion,  // .opticalInversion (lens flip) or .foldFree (legible)
-        dispersion: 0.85,         // 6-tap spectral dispersion
-        fresnelRim: 0.75,         // Crisp white rim highlight
-        cornerRadius: 28.0
-    )
+---
+
+## 🌐 2. TypeScript & WebGL 2.0 (Web / Frontend)
+
+A zero-dependency TypeScript implementation bringing the exact same physical lens refraction, optical inversion, and 6-tap spectral dispersion directly to HTML5 Canvas and React/Vue apps.
+
+### 🚀 Run the Web Demo
+```bash
+cd web
+pnpm install
+pnpm run dev
+```
+Open `http://localhost:5173` to interact with the live browser demo. Drag the liquid glass card over the "Glint" title bar to see real-time optical inversion, text flipping, and continuous spectrum dispersion!
+
+### 🛠 Usage in TypeScript
+```typescript
+import { LiquidGlassLens } from './web/src';
+
+const canvas = document.getElementById('my-canvas') as HTMLCanvasElement;
+
+const lens = new LiquidGlassLens(canvas, {
+  width: 320,
+  height: 180,
+  bezel: 20,
+  strength: 30,
+  mode: 'opticalInversion', // 'opticalInversion' | 'foldFree'
+  dispersion: 0.85,
+  fresnelRim: 0.75,
+  draggable: true
+});
+
+// Provide a backdrop image or canvas
+const image = new Image();
+image.src = '/backdrop.png';
+image.onload = () => lens.setBackdrop(image);
 ```
 
 ---
