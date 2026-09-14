@@ -1,213 +1,219 @@
 ---
 name: liquid-glass-lens
 description: >-
-  Design and implement Apple-style Liquid Glass effects with realistic physical lens refraction,
+  Design and implement authentic Apple-style Liquid Glass effects with realistic physical lens refraction,
   6-tap continuous spectrum dispersion, optical inversion (UV folding 倒像), continuous squircle SDF geometry,
-  Blinn-Phong highlight arc, and Fresnel contour edge lighting in SwiftUI & Metal.
-  Supports both In-App SwiftUI components AND Desktop Floating Panels/Bubbles (NSPanel with WindowServer penetration).
+  Blinn-Phong highlight arc, and Fresnel contour edge lighting across macOS, iOS (SwiftUI & Metal), and Web (WebGL 2.0 & TypeScript).
+  Supports Desktop Floating Panels (NSPanel with WindowServer penetration), In-App UI Cards/Pills, and WebGL Canvas Refraction.
   Activate whenever the user asks for "liquid glass", "lens refraction", "optical inversion",
-  "desktop floating bubble", "glassmorphism with real refraction", "dynamic island glass card", or macOS/iOS refractive UI controls.
+  "desktop floating bubble", "glassmorphism with real refraction", "dynamic island glass card", or macOS/iOS/Web refractive UI controls.
 ---
 
 # Universal Liquid Glass & Lens Refraction Skill
 
-This skill provides the complete architecture, optical formulas, Metal shaders, and macOS/iOS APIs to produce authentic **Apple Liquid Glass** with realistic fluid-like lens refraction, 6-tap continuous spectrum dispersion, and optical inversion.
+This skill is the **Canonical Reference & Engineering Guide** for implementing authentic **Apple Liquid Glass** across platforms. It provides exact optical formulas, shader code, and architectural patterns for:
+1. **macOS Desktop Floating Lens**: Cross-window hardware penetration at 120 FPS without screen recording permissions.
+2. **In-App SwiftUI Components**: Readable glass cards, tab bars, navigation pills, and interactive backdrop refraction canvases.
+3. **Web / Frontend (TypeScript & WebGL 2.0)**: Zero-dependency browser refraction over any DOM element, image, or canvas.
 
 ---
 
-## 1. Dual Deployment Modes
+## 🏛 The 3-Layer Glass Architecture Rule
 
-### Mode 1: Desktop Floating Bubble / Overlay (`NSPanel` + WindowServer)
-When you need a **floating bubble, floating pill, or Dynamic Island on the macOS desktop** that moves across the screen and **refracts real underlying windows (Safari, Xcode, Finder, Wallpaper)**:
+To maintain both authentic physical optics and user interface legibility, **always enforce 3 distinct layers**:
 
-* **No Screen Recording Permission Needed**: Uses Apple's hardware compositor bridge via `CABackdropLayer.windowServerAware = true`.
-* **Hardware Compositor Performance**: Runs directly in macOS WindowServer at 120 FPS.
-* **Panel Configuration**:
-  ```swift
-  let panel = NSPanel(
-      contentRect: NSRect(x: x, y: y, width: size, height: size),
-      styleMask: [.borderless, .nonactivatingPanel],
-      backing: .buffered,
-      defer: false
-  )
-  panel.isOpaque = false
-  panel.backgroundColor = .clear
-  panel.level = .floating
-  panel.isMovableByWindowBackground = true
-  panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-  ```
-* **WindowServer Glass Penetration Core**:
-  ```swift
-  // NSGlassEffectView + windowServerAware
-  let glass = NSClassFromString("NSGlassEffectView")!.init(frame: .zero)
-  glass.setValue(cornerRadius, forKey: "cornerRadius")
-  glass.perform(NSSelectorFromString("set_variant:"), with: 11) // v11: Apple Ultra Liquid Glass
-  glass.perform(NSSelectorFromString("set_contentLensing:"), with: 1) // Content Lensing (Refraction & Inversion)
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Foreground Content Layer (前景交互层)                     │
+│    - Typography, icons, controls, click targets             │
+│    - MUST remain 100% crisp, un-distorted & readable        │
+├─────────────────────────────────────────────────────────────┤
+│ 2. Lens & Physical Rim Layer (透镜折射与材质边缘层)          │
+│    - Continuous squircle SDF (p-norm ~4.2)                  │
+│    - 1.5px crisp white Fresnel rim contour                  │
+│    - 6-tap continuous spectrum dispersion (Blue→Cyan→Violet)│
+│    - Blinn-Phong specular arc highlight                     │
+├─────────────────────────────────────────────────────────────┤
+│ 1. Backdrop Layer (底层环境折射层)                          │
+│    - Underlying desktop windows (macOS Desktop)             │
+│    - Underlying app view hierarchy (SwiftUI Canvas)         │
+│    - Underlying texture / image (WebGL Canvas)              │
+└─────────────────────────────────────────────────────────────┘
+```
 
-  // Activate hardware backdrop in layer tree
-  func configureBackdrop(in layer: CALayer) {
-      if NSStringFromClass(type(of: layer)).contains("CABackdropLayer") {
-          layer.setValue(true, forKey: "windowServerAware")
-          layer.setValue(1.0, forKey: "scale")
-      }
-      layer.sublayers?.forEach { configureBackdrop(in: $0) }
-  }
-  ```
+> [!CAUTION]
+> **Anti-Pattern**: Never wrap the entire card (including its own text and buttons) in a high-strength `opticalInversion` shader! Doing so flips the user's text upside-down. The lens refracts the *backdrop*; the *foreground content* floats safely on top.
 
 ---
 
-### Mode 2: In-App SwiftUI Component (`layerEffect` + Metal Shader)
-When you need an in-app card, button, or TabBar with custom refraction, 6-tap dispersion, and optical inversion:
-* Apply `.liquidGlassLens(.opticalInversionPreset)` or `.liquidGlassLens(.foldFreePreset)`.
-* Uses `LiquidGlassLens.metal` via `view.layerEffect(...)`.
+## 🔬 Core Physics & Optical Parameters
 
----
+### 1. Dual Refraction Modes
+* **`foldFree` (Mode 0.0 - UI 控件防撕裂放大)**:
+  * Slope is clamped: $m'(s) \in (-1, 0)$. Monotone inward mapping.
+  * **Behavior**: Content magnifies smoothly at the rim with continuous spectrum dispersion, **never tears, never inverts, 100% readable**.
+  * **Best For**: Tab bars, segmented controls, buttons, cards.
+* **`opticalInversion` (Mode 1.0 - 真实物理凸透镜倒像)**:
+  * Steep slope exceeding $-1$ ($m'(s) < -1$). The UV sampling map folds over itself.
+  * **Behavior**: Thick convex lens optics. Underlying text sliding beneath the rim **inverts upside down**, horizontal dots split into dual rows, and shapes stretch along contour curves.
+  * **Best For**: Magnifying lenses, desktop floating bubbles, playful interactive canvases.
 
-## 2. Core Physics & Optical Concepts
+### 2. 6-Tap Continuous Spectrum Dispersion
+Instead of crude 3-tap RGB offsets (which produce harsh red/green chromatic fringing), sample 6 continuous spectral wavelengths from 380nm to 750nm (Red, Amber, Yellow-Green, Cyan, Blue, Violet). This produces Apple's signature smooth **Blue → Cyan → Violet** chromatic sheen.
 
-### 2.1 Optical Inversion vs. Fold-Free Magnification
-When light passes through a convex glass bevel (lens rim), the inward sampling offset $m(s)$ determines whether underlying content stays readable or inverts like a real thick magnifying glass:
+### 3. 20° Tangential Shear
+Refraction rays do not point strictly toward the center. Introducing a $20^\circ$ tangential component ($-\vec{N}\cos 20^\circ + \vec{T}\sin 20^\circ$) causes the distortion to sweep along the rim contour, creating an organic, fluid surface tension.
 
-* **Fold-Free Magnification (`mode = 0.0`)**
-  * **Behavior**: Slope is strictly clamped: $m'(s) \in (-1, 0)$. Monotone inward mapping.
-  * **Result**: Content magnifies smoothly at the rim with continuous spectrum dispersion, **never tears, never inverts, remains 100% legible**.
-  * **Best For**: Tab bars, segmented controls, interactive buttons, navigation pills.
-* **Optical Inversion (`mode = 1.0`, 截图同款倒立翻转)**
-  * **Behavior**: Slope exceeds $-1$ at the rim ($m'(s) < -1$). The UV sampling map folds over itself.
-  * **Result**: Real thick convex lens behavior. Text sliding beneath the bevel **inverts upside-down**, horizontal dots **split into double rows**, and shapes stretch into curved contours.
-  * **Best For**: Dynamic Island overlays, desktop floating bubbles, status bar lenses.
-
-### 2.2 6-Tap Continuous Spectrum Dispersion
-Instead of crude 3-tap RGB offsets (which produce unnatural harsh pure green/red fringes), use a 6-tap continuous spectrum from red through orange, amber, yellow-green, cyan, blue, to violet. This delivers Apple's smooth **blue → cyan → magenta** chromatic sheen.
-
-### 2.3 20° Tangential Shear
-Refraction rays do not point strictly toward the center. Introducing a $20^\circ$ tangential component ($-\vec{N} \cos 20^\circ + \vec{T} \sin 20^\circ$) causes the distortion to visibly **sweep along the rim contour**, making the glass feel alive and fluid.
-
-### 2.4 iOS Continuous Curvature (Squircle)
-Standard Euclidean rounded rectangles have discontinuous curvature where arcs meet straight edges. Use p-norm ($p \approx 4.2$) distance fields:
+### 4. iOS Squircle Continuous Curvature
+Use p-norm ($p \approx 4.2$) distance fields:
 $$\|q\|_p = (|q_x|^p + |q_y|^p)^{1/p}$$
+This eliminates tangent discontinuities where arcs meet straight edges.
 
 ---
 
-## 3. Production Metal Shader (`LiquidGlassLens.metal`)
+## 🛠 Platform Implementation Recipes
 
-```metal
-#include <metal_stdlib>
-#include <SwiftUI/SwiftUI_Metal.h>
-using namespace metal;
+### Recipe 1: macOS Desktop Floating Lens (`DesktopGlassLens`)
+For a system-wide floating lens that hovers over other desktop apps (Xcode, Safari, Finder, Wallpaper) with **zero screen recording permissions**:
 
-static float sdContinuousBox(float2 p, float2 b, float r, float n) {
-    float2 q = abs(p) - b;
-    if (n <= 2.02) {
-        return length(max(q, float2(0.0))) + min(max(q.x, q.y), 0.0) - r;
-    } else {
-        float2 m = max(q, float2(0.0));
-        float s = pow(m.x, n) + pow(m.y, n);
-        float outside = (s > 0.0) ? pow(s, 1.0 / n) : 0.0;
-        return min(max(q.x, q.y), 0.0) + outside - r;
+```swift
+import LiquidGlassKit
+
+// 1. Pure floating glass bubble
+DesktopGlassLens.shared.showCircle(diameter: 220)
+
+// 2. Custom floating panel with foreground content
+DesktopGlassLens.shared.show(
+    width: 320,
+    height: 160,
+    cornerRadius: 28
+) {
+    VStack(spacing: 6) {
+        Image(systemName: "sparkles").font(.title)
+        Text("Desktop Lens").font(.headline)
     }
+    .foregroundColor(.white)
+}
+```
+
+*Key Mechanics*:
+* `NSPanel` with `.borderless, .nonactivatingPanel`, `level = .floating`.
+* `isMovableByWindowBackground = true` for zero-code drag-and-drop anywhere on the desktop.
+* Uses Apple's WindowServer compositor penetration via `NSGlassEffectView` + `CABackdropLayer.windowServerAware = true`.
+
+---
+
+### Recipe 2: In-App SwiftUI UI Components (Readable Cards & Pills)
+
+```swift
+import SwiftUI
+import LiquidGlassKit
+
+// Liquid Glass Card (Protects foreground text from distortion)
+LiquidGlassCard(config: .cardPreset) {
+    VStack(alignment: .leading, spacing: 10) {
+        Text("Glass Card Title")
+            .font(.headline)
+            .foregroundColor(.white)
+        Text("Foreground text remains crisp while edges refract.")
+            .font(.caption)
+            .foregroundColor(.white.opacity(0.8))
+    }
+    .padding(20)
 }
 
-[[ stitchable ]] half4 liquidGlassLens(
-    float2 position,
-    SwiftUI::Layer layer,
-    float2 boundsSize,
-    float cornerRadius,
-    float cornerExponent,
-    float bezel,
-    float strength,
-    float mode,
-    float dispersion,
-    float fresnel,
-    float specular,
-    float lightAngle
-) {
-    float2 center = boundsSize * 0.5;
-    float2 p = position - center;
-
-    float minHalf = min(boundsSize.x, boundsSize.y) * 0.5;
-    float r = (cornerRadius < 0.0) ? minHalf : min(cornerRadius, minHalf);
-    float2 halfExtents = max(boundsSize * 0.5 - float2(r), float2(0.0));
-
-    float d = sdContinuousBox(p, halfExtents, r, cornerExponent);
-    if (d > 1.5) return layer.sample(position);
-
-    float inside = -d;
-    float safeBezel = max(bezel, 1.0);
-    float t = clamp(inside / safeBezel, 0.0, 1.0);
-    float edge = 1.0 - t;
-
-    // Normal via central difference
-    const float e = 1.0;
-    float dx = sdContinuousBox(p + float2(e, 0.0), halfExtents, r, cornerExponent)
-             - sdContinuousBox(p - float2(e, 0.0), halfExtents, r, cornerExponent);
-    float dy = sdContinuousBox(p + float2(0.0, e), halfExtents, r, cornerExponent)
-             - sdContinuousBox(p - float2(0.0, e), halfExtents, r, cornerExponent);
-    float2 normalDir = normalize(float2(dx, dy) + float2(1e-6, 0.0));
-
-    // Profile selection
-    float k = min(2.0 * strength / safeBezel, 0.88);
-    float magFoldFree = 0.5 * k * safeBezel * edge * edge;
-    float magInversion = strength * (pow(edge, 1.6) + 1.35 * pow(edge, 3.2));
-    float m = mix(magFoldFree, magInversion, clamp(mode, 0.0, 1.0));
-
-    // Tangential shear
-    float2 inward = -normalDir;
-    float2 tangent = float2(-normalDir.y, normalDir.x);
-    float2 baseOffset = (inward * 0.9397 + tangent * 0.3420) * m;
-
-    // 6-Tap continuous spectrum
-    float spread = dispersion * 0.18 * edge;
-    constexpr int TAPS = 6;
-    const float3 weights[TAPS] = {
-        float3(1.00, 0.05, 0.00),
-        float3(1.00, 0.58, 0.00),
-        float3(0.50, 1.00, 0.15),
-        float3(0.00, 1.00, 0.70),
-        float3(0.12, 0.35, 1.00),
-        float3(0.65, 0.00, 0.85)
-    };
-    const float sumR = 3.27, sumG = 2.93, sumB = 2.70;
-
-    half4 col = half4(0.0);
-    for (int i = 0; i < TAPS; ++i) {
-        float u = float(i) / float(TAPS - 1);
-        float f = 1.0 + spread * (2.0 * u - 1.0);
-        half4 tap = layer.sample(position + baseOffset * f);
-        col.r += tap.r * half(weights[i].r);
-        col.g += tap.g * half(weights[i].g);
-        col.b += tap.b * half(weights[i].b);
-        col.a += tap.a * half(1.0 / float(TAPS));
+// Liquid Glass Pill (TabBar / Capsule Button)
+LiquidGlassPill(config: .foldFreePreset) {
+    HStack(spacing: 20) {
+        Image(systemName: "house.fill")
+        Image(systemName: "magnifyingglass")
+        Image(systemName: "person.crop.circle")
     }
-    col.r /= half(sumR);
-    col.g /= half(sumG);
-    col.b /= half(sumB);
-
-    // Specular arc & Fresnel rim hairline
-    float2 L = normalize(float2(cos(lightAngle), sin(lightAngle)));
-    float dotNL = max(dot(normalDir, -L), 0.0);
-    float arcWindow = exp(-pow((edge - 0.22) / 0.18, 2.0));
-    half specLobe = half(pow(dotNL, 18.0) * arcWindow * specular);
-    half hairline = half((1.0 - smoothstep(0.0, 3.5, inside)) * fresnel * 0.95);
-    float counterRim = max(dot(normalDir, L), 0.0) * edge * 0.14;
-
-    col.rgb += half3(specLobe + hairline);
-    col.rgb = max(col.rgb - half3(counterRim * col.a), half3(0.0));
-
-    float coverage = clamp(inside + 0.5, 0.0, 1.0);
-    return mix(layer.sample(position), col, half(coverage));
+    .foregroundColor(.white)
+    .padding(.horizontal, 20)
+    .padding(.vertical, 10)
 }
 ```
 
 ---
 
-## 4. Quick API Reference
+### Recipe 3: In-App SwiftUI True Backdrop Refraction Canvas
+
+When you want an in-app lens to physically refract and invert background elements (images, typography, lists) as it moves:
 
 ```swift
-// 1. Launch a real desktop floating bubble
-DesktopGlassBubble.shared.show(size: 220)
+LiquidGlassCanvas(
+    lensCenter: lensPosition,
+    lensSize: CGSize(width: 300, height: 160),
+    config: .opticalInversionPreset
+) {
+    // Backdrop content (Images, text, color blocks)
+    MyBackdropView()
+} overlay: {
+    // Controls floating above the lens (e.g. drag handle)
+    MyOverlayView()
+}
+```
 
-// 2. Or apply to any SwiftUI in-app view
-MyCard()
-    .liquidGlassLens(.opticalInversionPreset)
+---
+
+### Recipe 4: Web / Frontend (TypeScript & WebGL 2.0)
+
+```typescript
+import { LiquidGlassLens } from 'liquid-glass-ts';
+
+const canvas = document.getElementById('webgl-canvas') as HTMLCanvasElement;
+
+const lens = new LiquidGlassLens(canvas, {
+  width: 360,
+  height: 180,
+  bezel: 22,
+  strength: 32,
+  mode: 'opticalInversion', // or 'foldFree'
+  dispersion: 0.90,
+  fresnelRim: 0.85,
+  draggable: true
+});
+
+// Pass any image, canvas, or video frame as backdrop
+const image = new Image();
+image.src = '/assets/backdrop.jpg';
+image.onload = () => lens.setBackdrop(image);
+```
+
+---
+
+## 📐 Mathematical Reference: Metal & GLSL Shader
+
+```metal
+// Normal via central differences on Continuous Squircle SDF
+const float e = 1.0;
+float dx = sdContinuousBox(p + float2(e, 0.0), halfExtents, r, cornerExponent)
+         - sdContinuousBox(p - float2(e, 0.0), halfExtents, r, cornerExponent);
+float dy = sdContinuousBox(p + float2(0.0, e), halfExtents, r, cornerExponent)
+         - sdContinuousBox(p - float2(0.0, e), halfExtents, r, cornerExponent);
+float2 normalDir = normalize(float2(dx, dy) + float2(1e-6, 0.0));
+
+// Dual displacement profile
+float k = min(2.0 * strength / safeBezel, 0.88);
+float magFoldFree = 0.5 * k * safeBezel * edge * edge;
+float magInversion = strength * (pow(edge, 1.6) + 1.35 * pow(edge, 3.2));
+float m = mix(magFoldFree, magInversion, clamp(mode, 0.0, 1.0));
+
+// 20° Tangential shear
+float2 inward = -normalDir;
+float2 tangent = float2(-normalDir.y, normalDir.x);
+float2 baseOffset = (inward * 0.9397 + tangent * 0.3420) * m;
+
+// 6-Tap Spectral Dispersion
+for (int i = 0; i < 6; ++i) {
+    float u = float(i) / 5.0;
+    float f = 1.0 + dispersion * 0.18 * edge * (2.0 * u - 1.0);
+    half4 tap = layer.sample(position + baseOffset * f);
+    col.rgb += tap.rgb * weights[i];
+}
+
+// Crisp Fresnel hairline (0.0 to 3.5px boundary)
+half hairline = half((1.0 - smoothstep(0.0, 3.5, inside)) * fresnel * 0.95);
+col.rgb += half3(specLobe + hairline);
 ```

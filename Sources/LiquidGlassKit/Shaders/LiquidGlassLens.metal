@@ -10,7 +10,7 @@ using namespace metal;
 // 1. iOS Continuous Squircle (p-norm ~4.2) / Capsule / Rounded Box SDF
 // 2. Dual Displacement Modes:
 //    - mode = 0.0: Fold-Free Magnification (UI 控件推荐，单调放大，防撕裂)
-//    - mode = 1.0: Optical Inversion (物理光学倒像，截图同款：文字颠倒、图标双排裂变)
+//    - mode = 1.0: Optical Inversion (物理光学倒像：凸透镜 UV 折叠、文字颠倒翻转)
 // 3. 20° Tangential Shear (沿边缘切向流淌扭曲)
 // 4. 6-Tap Continuous Spectrum Dispersion (蓝→青→品红顺滑流光色散，消除死板红绿边)
 // 5. Blinn-Phong Specular Arc + Crisp Fresnel Hairline (灵动岛下边缘白色高光轮廓)
@@ -138,6 +138,109 @@ static float sdContinuousBox(float2 p, float2 b, float r, float n) {
     col.rgb = max(col.rgb - half3(counterRim * col.a), half3(0.0));
 
     // Smooth edge alpha antialiasing
+    float coverage = clamp(inside + 0.5, 0.0, 1.0);
+    return mix(layer.sample(position), col, half(coverage));
+}
+
+// =============================================================================
+// liquidGlassCanvas
+// Multi-layer in-app backdrop refraction shader.
+// Runs across the entire canvas / container, taking lensCenter and lensSize
+// to physically refract and invert whatever backdrop content is behind the lens!
+// =============================================================================
+[[ stitchable ]] half4 liquidGlassCanvas(
+    float2 position,
+    SwiftUI::Layer layer,
+    float2 lensCenter,
+    float2 lensSize,
+    float cornerRadius,
+    float cornerExponent,
+    float bezel,
+    float strength,
+    float mode,
+    float dispersion,
+    float fresnel,
+    float specular,
+    float lightAngle
+) {
+    float2 p = position - lensCenter;
+
+    float minHalf = min(lensSize.x, lensSize.y) * 0.5;
+    float r = (cornerRadius < 0.0) ? minHalf : min(cornerRadius, minHalf);
+    float2 halfExtents = max(lensSize * 0.5 - float2(r), float2(0.0));
+
+    float d = sdContinuousBox(p, halfExtents, r, cornerExponent);
+
+    if (d > 1.5) {
+        return layer.sample(position);
+    }
+
+    float inside = -d;
+    float safeBezel = max(bezel, 1.0);
+    float t = clamp(inside / safeBezel, 0.0, 1.0);
+    float edge = 1.0 - t;
+
+    // Normal via central difference
+    const float e = 1.0;
+    float dx = sdContinuousBox(p + float2(e, 0.0), halfExtents, r, cornerExponent)
+             - sdContinuousBox(p - float2(e, 0.0), halfExtents, r, cornerExponent);
+    float dy = sdContinuousBox(p + float2(0.0, e), halfExtents, r, cornerExponent)
+             - sdContinuousBox(p - float2(0.0, e), halfExtents, r, cornerExponent);
+    float2 normalDir = normalize(float2(dx, dy) + float2(1e-6, 0.0));
+
+    // Dual Displacement
+    float k = min(2.0 * strength / safeBezel, 0.88);
+    float magFoldFree = 0.5 * k * safeBezel * edge * edge;
+    float magInversion = strength * (pow(edge, 1.6) + 1.35 * pow(edge, 3.2));
+    float m = mix(magFoldFree, magInversion, clamp(mode, 0.0, 1.0));
+
+    // 20° Tangential shear
+    const float ct = 0.9397;
+    const float st = 0.3420;
+    float2 inward = -normalDir;
+    float2 tangent = float2(-normalDir.y, normalDir.x);
+    float2 baseOffset = (inward * ct + tangent * st) * m;
+
+    // 6-Tap Spectral Dispersion
+    float spread = dispersion * 0.18 * edge;
+    constexpr int TAPS = 6;
+    const float3 weights[TAPS] = {
+        float3(1.00, 0.05, 0.00),
+        float3(1.00, 0.58, 0.00),
+        float3(0.50, 1.00, 0.15),
+        float3(0.00, 1.00, 0.70),
+        float3(0.12, 0.35, 1.00),
+        float3(0.65, 0.00, 0.85)
+    };
+    const float sumR = 3.27, sumG = 2.93, sumB = 2.70;
+
+    half4 col = half4(0.0);
+    for (int i = 0; i < TAPS; ++i) {
+        float u = float(i) / float(TAPS - 1);
+        float f = 1.0 + spread * (2.0 * u - 1.0);
+        float2 samplePos = position + baseOffset * f;
+        half4 tap = layer.sample(samplePos);
+
+        col.r += tap.r * half(weights[i].r);
+        col.g += tap.g * half(weights[i].g);
+        col.b += tap.b * half(weights[i].b);
+        col.a += tap.a * half(1.0 / float(TAPS));
+    }
+    col.r /= half(sumR);
+    col.g /= half(sumG);
+    col.b /= half(sumB);
+
+    // Specular Arc & Crisp Fresnel Hairline
+    float2 L = normalize(float2(cos(lightAngle), sin(lightAngle)));
+    float dotNL = max(dot(normalDir, -L), 0.0);
+    float arcWindow = exp(-pow((edge - 0.22) / 0.18, 2.0));
+    half specLobe = half(pow(dotNL, 18.0) * arcWindow * specular);
+    half hairline = half((1.0 - smoothstep(0.0, 3.5, inside)) * fresnel * 0.95);
+    float counterRim = max(dot(normalDir, L), 0.0) * edge * 0.14;
+
+    col.rgb += half3(specLobe + hairline);
+    col.rgb = max(col.rgb - half3(counterRim * col.a), half3(0.0));
+
     float coverage = clamp(inside + 0.5, 0.0, 1.0);
     return mix(layer.sample(position), col, half(coverage));
 }

@@ -3,33 +3,56 @@ import SwiftUI
 import QuartzCore
 
 // =============================================================================
-// DesktopGlassBubble.swift
-// 原生 macOS 桌面全局透明悬浮气泡 / 液态透镜面板
+// DesktopGlassLens.swift (原 DesktopGlassBubble)
+// macOS 桌面全局悬浮透明液态玻璃镜片 / 面板 (Desktop Floating Liquid Glass Lens)
 //
-// 核心能力：
-// 1. NSPanel 全局悬浮在所有窗口之巅 (.floating)，任意桌面空间穿梭 (.canJoinAllSpaces)
-// 2. 鼠标按住直接在桌面上拖拽 (isMovableByWindowBackground = true)
-// 3. 激活 WindowServer 硬件级真实跨窗口穿透合成 (windowServerAware = true)
-// 4. 真实折射桌面上的任何其他 App（Xcode、浏览器、Finder、桌面壁纸），无需录屏权限！
+// 核心架构：
+// 1. NSPanel 全局浮动于所有窗口顶层 (.floating)，可在所有桌面空间漫游 (.canJoinAllSpaces)
+// 2. 鼠标按住窗口任意背景直接拖拽 (isMovableByWindowBackground = true)
+// 3. 驱动 WindowServer 硬件级真实跨窗口穿透合成，无需任何屏幕录制权限
+// 4. 三层架构：穿透折射底板 + 菲涅尔高光轮廓 + 独立前景交互插槽
 // =============================================================================
 
-/// 桌面悬浮气泡控制器
+/// 桌面全局悬浮透镜管理器
 @MainActor
-public final class DesktopGlassBubble {
-    public static let shared = DesktopGlassBubble()
-    private var panel: DesktopBubblePanel?
+public final class DesktopGlassLens {
+    public static let shared = DesktopGlassLens()
+    private var panel: DesktopLensPanel?
 
     public init() {}
 
-    /// 在屏幕中央升起一颗真实的桌面折射气泡
-    public func show(size: CGFloat = 220, initialPoint: CGPoint? = nil) {
-        if let existing = panel {
-            existing.makeKeyAndOrderFront(nil)
-            return
-        }
-        let p = DesktopBubblePanel(size: size, initialPoint: initialPoint)
+    /// 在桌面显示悬浮镜片
+    /// - Parameters:
+    ///   - width: 宽度
+    ///   - height: 高度
+    ///   - cornerRadius: 圆角（-1 代表正圆/全胶囊）
+    ///   - initialPoint: 初始屏幕坐标（可选）
+    ///   - content: 浮动在镜片上的自定义前景 View（可选）
+    public func show<Content: View>(
+        width: CGFloat = 220,
+        height: CGFloat = 220,
+        cornerRadius: CGFloat = -1,
+        initialPoint: CGPoint? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        panel?.orderOut(nil)
+        let resolvedRadius = cornerRadius < 0 ? min(width, height) / 2 : cornerRadius
+        let p = DesktopLensPanel(
+            width: width,
+            height: height,
+            cornerRadius: resolvedRadius,
+            initialPoint: initialPoint,
+            content: content
+        )
         self.panel = p
         p.makeKeyAndOrderFront(nil)
+    }
+
+    /// 便捷方法：快速升起一颗纯折射水晶玻璃球
+    public func showCircle(diameter: CGFloat = 220, initialPoint: CGPoint? = nil) {
+        show(width: diameter, height: diameter, cornerRadius: diameter / 2, initialPoint: initialPoint) {
+            EmptyView()
+        }
     }
 
     public func hide() {
@@ -38,13 +61,22 @@ public final class DesktopGlassBubble {
     }
 }
 
+/// 兼容别名
+public typealias DesktopGlassBubble = DesktopGlassLens
+
 /// 桌面全局透明无边框 Panel
-public final class DesktopBubblePanel: NSPanel {
-    public init(size: CGFloat = 220, initialPoint: CGPoint? = nil) {
+public final class DesktopLensPanel: NSPanel {
+    public init<Content: View>(
+        width: CGFloat,
+        height: CGFloat,
+        cornerRadius: CGFloat,
+        initialPoint: CGPoint?,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
         let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-        let x = initialPoint?.x ?? (screenFrame.midX - size / 2)
-        let y = initialPoint?.y ?? (screenFrame.midY - size / 2)
-        let rect = NSRect(x: x, y: y, width: size, height: size)
+        let x = initialPoint?.x ?? (screenFrame.midX - width / 2)
+        let y = initialPoint?.y ?? (screenFrame.midY - height / 2)
+        let rect = NSRect(x: x, y: y, width: width, height: height)
 
         super.init(
             contentRect: rect,
@@ -61,39 +93,60 @@ public final class DesktopBubblePanel: NSPanel {
         self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         self.isReleasedWhenClosed = false
 
-        let hosting = NSHostingView(rootView: DesktopBubbleView(size: size))
+        let hosting = NSHostingView(
+            rootView: DesktopLensView(
+                width: width,
+                height: height,
+                cornerRadius: cornerRadius,
+                content: content
+            )
+        )
         self.contentView = hosting
     }
 }
 
-/// 气泡的 SwiftUI 渲染层（真实穿透底层的苹果液态透镜 + 菲涅尔白边）
-public struct DesktopBubbleView: View {
-    public var size: CGFloat
+/// 桌面透镜的 SwiftUI 渲染层
+public struct DesktopLensView<Content: View>: View {
+    public var width: CGFloat
+    public var height: CGFloat
+    public var cornerRadius: CGFloat
+    public var content: () -> Content
+
     @State private var isHovered = false
 
-    public init(size: CGFloat = 220) {
-        self.size = size
+    public init(
+        width: CGFloat,
+        height: CGFloat,
+        cornerRadius: CGFloat,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.width = width
+        self.height = height
+        self.cornerRadius = cornerRadius
+        self.content = content
     }
 
     public var body: some View {
-        ZStack {
-            // 1. 真实穿透 WindowServer 底层任何窗口的原生 Liquid Glass 背板
-            WindowServerGlassBackdrop(cornerRadius: size / 2)
-                .clipShape(Circle())
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
-            // 2. 玻璃球体微光反光层 (产生高透球体质感)
-            Circle()
+        ZStack {
+            // Layer 1: 真实穿透 WindowServer 底层窗口的原生透镜折射底板
+            WindowServerGlassBackdrop(cornerRadius: cornerRadius)
+                .clipShape(shape)
+
+            // Layer 2: 玻璃表面微光反光层 (高透球体/曲面质感)
+            shape
                 .fill(
                     RadialGradient(
-                        colors: [Color.white.opacity(0.12), Color.white.opacity(0.0)],
+                        colors: [Color.white.opacity(0.14), Color.white.opacity(0.0)],
                         center: .topLeading,
                         startRadius: 10,
-                        endRadius: size * 0.75
+                        endRadius: max(width, height) * 0.75
                     )
                 )
 
-            // 3. 菲涅尔外圈与高光弧线（截图同款清透白边）
-            Circle()
+            // Layer 3: 连续曲率菲涅尔边缘高光弧线 (Crisp Fresnel Rim)
+            shape
                 .strokeBorder(
                     LinearGradient(
                         colors: [
@@ -104,26 +157,13 @@ public struct DesktopBubbleView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 2.0
+                    lineWidth: 1.5
                 )
 
-            // 4. 中心可爱的交互提示（悬浮或静止时显示）
-            VStack(spacing: 5) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(.white.opacity(0.95))
-                Text("桌面折射气泡")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundColor(.white.opacity(0.95))
-                Text("按住直接在桌面上拖拽")
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.75))
-            }
-            .shadow(color: .black.opacity(0.4), radius: 3, x: 0, y: 1)
-            .opacity(isHovered ? 0.3 : 0.85)
-            .animation(.easeInOut(duration: 0.2), value: isHovered)
+            // Layer 4: 前景内容层（用户传入的图标、文字、控件等，不受扭曲影响）
+            content()
         }
-        .frame(width: size, height: size)
+        .frame(width: width, height: height)
         .onHover { hovering in
             isHovered = hovering
         }
@@ -190,7 +230,7 @@ public struct WindowServerGlassBackdrop: NSViewRepresentable {
             return container
         }
 
-        // 降级兜底
+        // 降级兜底：标准 AppKit 毛玻璃
         let fallback = NSVisualEffectView()
         fallback.material = .popover
         fallback.blendingMode = .behindWindow

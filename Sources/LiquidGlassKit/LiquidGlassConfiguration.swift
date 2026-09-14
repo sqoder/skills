@@ -5,7 +5,7 @@ public enum LiquidGlassRefractionMode: Float, CaseIterable, Sendable {
     /// 防撕裂单调放大：保持文字可读，边缘平滑放大与流光色散，适合导航栏、按钮、TabBar
     case foldFree = 0.0
 
-    /// 真实物理倒像（截图同款）：大曲率厚透镜，UV折叠，文字颠倒翻转、图标分裂裂变
+    /// 真实物理倒像：大曲率厚透镜，UV折叠，文字颠倒翻转、图标分裂裂变
     case opticalInversion = 1.0
 }
 
@@ -35,7 +35,7 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
     /// 6波段连续光谱色散强度（0.0 ~ 2.0）
     public var dispersion: CGFloat
 
-    /// 边缘菲涅尔白色轮廓线亮度（截图下边缘那道极清透的白边）
+    /// 边缘菲涅尔白色轮廓线亮度（外边缘清透立体白边高光）
     public var fresnelRim: CGFloat
 
     /// 边缘 Blinn-Phong 弧光高光强度
@@ -84,9 +84,9 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
         }
     }
 
-    // MARK: - 经典预设
+    // MARK: - 经典场景预设
 
-    /// 【截图同款】真实物理光学倒像：文字颠倒、图标分裂、厚透镜菲涅尔亮边
+    /// 【物理透镜 / 桌面放大镜】真实凸透镜倒像：UV 折叠颠倒、厚透镜菲涅尔立体亮边，适合桌面全局镜片或物理透镜组件
     public static var opticalInversionPreset: LiquidGlassConfiguration {
         LiquidGlassConfiguration(
             bezel: 18.0,
@@ -99,7 +99,7 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
         )
     }
 
-    /// 【UI控件标杆】防撕裂平滑放大：文字清晰正向、边缘微变形、6色流光，适合 TabBar、按钮
+    /// 【UI 控件 / TabBar / 按钮】防撕裂单调放大：文字完全清晰、边缘微变形、6 色流光，适合导航栏、按钮、控制条
     public static var foldFreePreset: LiquidGlassConfiguration {
         LiquidGlassConfiguration(
             bezel: 14.0,
@@ -112,7 +112,20 @@ public struct LiquidGlassConfiguration: Equatable, Sendable {
         )
     }
 
-    /// 【水晶水滴】清透大水滴感，高菲涅尔光、弱色散
+    /// 【App 卡片容器】高级液态玻璃卡片预设：平滑超椭圆边缘、晶莹透光、适度菲涅尔微光
+    public static var cardPreset: LiquidGlassConfiguration {
+        LiquidGlassConfiguration(
+            bezel: 16.0,
+            strength: 18.0,
+            mode: .foldFree,
+            dispersion: 0.70,
+            fresnelRim: 0.60,
+            specular: 0.40,
+            shape: .squircle(radius: 24.0)
+        )
+    }
+
+    /// 【水晶水滴】清透大水滴感，高菲涅尔光、柔和色散
     public static var crystalWaterPreset: LiquidGlassConfiguration {
         LiquidGlassConfiguration(
             bezel: 22.0,

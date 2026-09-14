@@ -1,77 +1,72 @@
 import { LiquidGlassLens } from './LiquidGlassLens';
 
-// 1. 生成底层的测试画面（包含第二张截图里的 Glint 窗口标题栏与多彩半色调艺术背景）
+// 生成底层的现代测试画报（包含高对比度几何色块、波点阵列与精密排版，绝佳展现倒像与色散）
 function createTestBackdrop(width: number, height: number): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d')!;
 
-  // 渐变底色
+  // 1. 深邃的多色阶渐变底色
   const grad = ctx.createLinearGradient(0, 0, width, height);
-  grad.addColorStop(0, '#2b3a67');
-  grad.addColorStop(0.5, '#49609c');
-  grad.addColorStop(1, '#8f5da5');
+  grad.addColorStop(0, '#101626');
+  grad.addColorStop(0.4, '#1b2342');
+  grad.addColorStop(0.7, '#2f214a');
+  grad.addColorStop(1, '#481d3f');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // 模拟半色调（Halftone）点阵艺术底纹
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-  for (let x = 0; x < width; x += 16) {
-    for (let y = 0; y < height; y += 16) {
-      const rad = (Math.sin(x * 0.05) + Math.cos(y * 0.05) + 2) * 2;
+  // 2. 半色调点阵艺术底纹
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+  for (let x = 20; x < width; x += 24) {
+    for (let y = 20; y < height; y += 24) {
+      const rad = (Math.sin(x * 0.04) + Math.cos(y * 0.04) + 2) * 1.8;
       ctx.beginPath();
       ctx.arc(x, y, rad, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
-  // 绘制底部“Glint”窗口标题栏（完美还原第二张截图）
-  const barW = Math.min(width - 80, 860);
-  const barH = 54;
-  const barX = (width - barW) / 2;
-  const barY = height - 160;
+  // 3. 绘制大型现代排版海报卡片（测试倒立折射与色散）
+  const cardW = Math.min(width - 100, 880);
+  const cardH = 220;
+  const cardX = (width - cardW) / 2;
+  const cardY = height - 320;
 
-  // 标题栏背景
   ctx.save();
-  ctx.fillStyle = 'rgba(24, 28, 38, 0.94)';
+  ctx.fillStyle = 'rgba(12, 16, 28, 0.75)';
   ctx.beginPath();
-  ctx.roundRect(barX, barY, barW, barH, 16);
+  ctx.roundRect(cardX, cardY, cardW, cardH, 24);
   ctx.fill();
 
-  // 窗口红黄绿三灯
-  const lights = ['#ff5f56', '#ffbd2e', '#27c93f'];
-  lights.forEach((color, i) => {
-    ctx.beginPath();
-    ctx.arc(barX + 24 + i * 18, barY + barH / 2, 6, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 标题
+  ctx.font = '900 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText('LIQUID GLASS LENS REFRACTION', cardX + 36, cardY + 58);
+
+  // 副标题与物理特性指标
+  ctx.font = '500 15px -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.fillText('Drag the physical convex lens over this area to witness UV folding inversion & 6-tap dispersion', cardX + 36, cardY + 92);
+
+  // 彩色几何色带 (用于观察连续光谱蓝->青->紫微光色散)
+  const bands = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#00c7be', '#32ade6', '#007aff', '#5856d6', '#af52de'];
+  const bandW = (cardW - 72) / bands.length;
+  bands.forEach((color, idx) => {
     ctx.fillStyle = color;
-    ctx.fill();
-  });
-
-  // 标题文字 "Glint"
-  ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('Glint', barX + 110, barY + barH / 2 + 6);
-
-  // 椭圆三点图标
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-  ctx.beginPath();
-  ctx.arc(barX + 175, barY + barH / 2, 14, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = '#ffffff';
-  for (let j = -1; j <= 1; j++) {
     ctx.beginPath();
-    ctx.arc(barX + 175 + j * 6, barY + barH / 2, 2, 0, Math.PI * 2);
+    ctx.roundRect(cardX + 36 + idx * bandW, cardY + 124, bandW - 6, 14, 4);
     ctx.fill();
-  }
-
-  // 模拟右侧小图标 (铅笔、分屏、眼睛、对齐、分享、图钉、垃圾桶)
-  ctx.font = '16px -apple-system, BlinkMacSystemFont, sans-serif';
-  const symbols = ['✏️', '◫', '👁', '≡', '⇪', '📌', '🗑'];
-  symbols.forEach((sym, idx) => {
-    ctx.fillText(sym, barX + barW - 220 + idx * 30, barY + barH / 2 + 6);
   });
+
+  // 底部指标标注
+  ctx.font = '600 13px -apple-system, BlinkMacSystemFont, monospace';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.fillText('PHYSICS: SNEIL LAW | 6-TAP SPECTRUM (380-750nm) | TANGENTIAL SHEAR 20° | SQUIRCLE p=4.2', cardX + 36, cardY + 180);
 
   ctx.restore();
   return canvas;
@@ -93,7 +88,7 @@ window.addEventListener('DOMContentLoaded', () => {
     width: 440 * dpr,
     height: 180 * dpr,
     initialX: canvas.width / 2,
-    initialY: canvas.height - 230 * dpr, // 初始位置微压在 Glint 栏上方，直接展现倒像！
+    initialY: canvas.height - 240 * dpr, // 初始位置微压在排版卡片上方，直观展现倒像！
     bezel: 22 * dpr,
     strength: 32 * dpr,
     mode: 'opticalInversion',
@@ -102,6 +97,16 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   lens.setBackdrop(backdrop);
+
+  // 窗口缩放适配
+  window.addEventListener('resize', () => {
+    const newW = window.innerWidth;
+    const newH = window.innerHeight;
+    canvas.width = newW * dpr;
+    canvas.height = newH * dpr;
+    const newBackdrop = createTestBackdrop(canvas.width, canvas.height);
+    lens.setBackdrop(newBackdrop);
+  });
 
   // 绑定控制面板
   const modeSelect = document.getElementById('mode-select') as HTMLSelectElement;

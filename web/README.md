@@ -34,7 +34,7 @@ pnpm install
 pnpm run dev
 ```
 
-Open `http://localhost:5173` to interact with the live demo. Drag the liquid glass card over the "Glint" title bar to see real-time optical inversion, text flipping, and continuous spectrum dispersion in action!
+Open `http://localhost:5173` to interact with the live demo. Drag the liquid glass card over the typography and graphic cards to see real-time optical inversion, text flipping, and continuous spectrum dispersion in action!
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "liquid-glass-ts",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Apple-style Liquid Glass Lens Refraction with Optical Inversion & 6-Tap Dispersion in TypeScript & WebGL",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
