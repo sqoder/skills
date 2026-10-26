@@ -74,8 +74,17 @@ Launches the **LiquidGlassKit Studio**:
 ### 📦 Installation
 ```swift
 dependencies: [
-    .package(url: "https://github.com/sqoder/LiquidGlassKit.git", from: "1.0.1")
+    .package(url: "https://github.com/sqoder/skills.git", branch: "LiquidGlassKit")
 ]
+```
+
+### 🔧 Modifying the Shader
+
+`Shaders/default.metallib` is a **precompiled** binary that SwiftPM copies verbatim (it does not compile `.metal` files). After editing `LiquidGlassLens.metal` you must regenerate it, otherwise the app keeps loading the stale shader:
+
+```bash
+./scripts/build-metallib.sh          # regenerate default.metallib
+./scripts/build-metallib.sh --check  # verify it is in sync (exit 1 if not)
 ```
 
 ### 🛠 Core Recipes for Swift

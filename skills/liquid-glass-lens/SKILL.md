@@ -160,7 +160,7 @@ LiquidGlassCanvas(
 ### Recipe 4: Web / Frontend (TypeScript & WebGL 2.0)
 
 ```typescript
-import { LiquidGlassLens } from 'liquid-glass-ts';
+import { LiquidGlassLens } from './web/src';
 
 const canvas = document.getElementById('webgl-canvas') as HTMLCanvasElement;
 

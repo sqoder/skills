@@ -1,3 +1,4 @@
+#if canImport(AppKit)
 import AppKit
 import SwiftUI
 import QuartzCore
@@ -239,3 +240,5 @@ public struct WindowServerGlassBackdrop: NSViewRepresentable {
 
     public func updateNSView(_ nsView: NSView, context: Context) {}
 }
+
+#endif // canImport(AppKit)

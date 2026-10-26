@@ -28,8 +28,8 @@ A lightweight, zero-dependency TypeScript library delivering authentic physical 
 ## 🚀 Quick Start & Interactive Demo
 
 ```bash
-git clone https://github.com/sqoder/liquid-glass-ts.git
-cd liquid-glass-ts
+git clone -b LiquidGlassKit https://github.com/sqoder/skills.git
+cd skills/web
 pnpm install
 pnpm run dev
 ```
@@ -40,10 +40,15 @@ Open `http://localhost:5173` to interact with the live demo. Drag the liquid gla
 
 ## 📦 Installation
 
+This package is **not published to npm** yet. Import the source directly from the repo:
+
 ```bash
-pnpm add liquid-glass-ts
-# or
-npm install liquid-glass-ts
+git clone -b LiquidGlassKit https://github.com/sqoder/skills.git
+# then copy web/src/ into your project, or add it as a local dependency
+```
+
+```bash
+pnpm add /path/to/skills/web
 ```
 
 ---
@@ -53,7 +58,7 @@ npm install liquid-glass-ts
 ### 1. Basic Setup with Canvas
 
 ```typescript
-import { LiquidGlassLens } from 'liquid-glass-ts';
+import { LiquidGlassLens } from './src';
 
 const canvas = document.getElementById('my-canvas') as HTMLCanvasElement;
 
