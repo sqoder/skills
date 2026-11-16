@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>macOS 原生三栏记事本 (Apple Notes 1:1 规范)</title>
+  <style>
+    :root {
+      --accent: #007aff;
+      --accent-soft: rgba(0, 122, 255, 0.12);
+      --accent-border: rgba(0, 122, 255, 0.28);
+      --traffic-red: #ff5f56;
+      --traffic-yellow: #ffbd2e;
+      --traffic-green: #27c93f;
+
+      --desktop-bg: radial-gradient(circle at 50% 20%, #d8e5f8 0%, #b4c9e8 100%);
+      --window-bg: #ffffff;
+      --window-border: rgba(0, 0, 0, 0.12);
+      --window-shadow: 0 24px 70px rgba(18, 38, 70, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.08);
+
+      --col1-bg: rgba(246, 246, 248, 0.88);
+      --col2-bg: #f8f8fa;
+      --col3-bg: #ffffff;
+      --divider-color: rgba(0, 0, 0, 0.08);
+
+      --text-primary: #1d1d1f;
+      --text-secondary: rgba(0, 0, 0, 0.55);
+      --text-tertiary: rgba(0, 0, 0, 0.35);
+      --section-header: rgba(0, 0, 0, 0.45);
+
+      --item-hover: rgba(0, 0, 0, 0.04);
+      --item-active: #007aff;
+
+      --btn-textured-bg: #ffffff;
+      --btn-textured-border: rgba(0, 0, 0, 0.14);
+      --btn-textured-shadow: 0 1px 1.5px rgba(0, 0, 0, 0.06);
+    }
+
+    body.theme-dark {
+      --desktop-bg: radial-gradient(circle at 50% 20%, #1e263d 0%, #0d0f17 100%);
+      --window-bg: #1e1e1e;
+      --window-border: rgba(255, 255, 255, 0.12);
+      --window-shadow: 0 28px 80px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1);
+
+      --col1-bg: rgba(38, 38, 42, 0.8);
+      --col2-bg: #1a1a1c;
+      --col3-bg: #141416;
+      --divider-color: rgba(255, 255, 255, 0.08);
+
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255, 255, 255, 0.65);
+      --text-tertiary: rgba(255, 255, 255, 0.4);
+      --section-header: rgba(255, 255, 255, 0.45);
+
+      --item-hover: rgba(255, 255, 255, 0.06);
+      --item-active: #007aff;
+
+      --btn-textured-bg: rgba(255, 255, 255, 0.1);
+      --btn-textured-border: rgba(255, 255, 255, 0.12);
+      --btn-textured-shadow: none;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-drag: none;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background: var(--desktop-bg);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+      padding: 24px;
+      overflow-x: hidden;
+      transition: background 0.3s ease;
+    }
+
+    .showcase-header {
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .showcase-title {
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-pill {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: rgba(0, 122, 255, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(0, 122, 255, 0.25);
+    }
+
+    .theme-switch {
+      display: flex;
+      background: rgba(0, 0, 0, 0.1);
+      padding: 3px;
+      border-radius: 20px;
+      border: 1px solid var(--window-border);
+      backdrop-filter: blur(10px);
+    }
+
+    body.theme-dark .theme-switch {
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    .theme-btn {
+      padding: 5px 16px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .theme-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0, 122, 255, 0.35);
+    }
+
+    /* ============================================================
+       三栏记事本主窗口 (3-Column NSSplitViewController)
+       ============================================================ */
+    .notebook-window {
+      width: 960px;
+      height: 580px;
+      background: var(--window-bg);
+      border-radius: 10px;
+      box-shadow: var(--window-shadow);
+      display: flex;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--window-border);
+    }
+
+    /* 栏目 1: 侧边栏 (Sidebar) */
+    .col-sidebar {
+      width: 190px;
+      height: 100%;
+      background: var(--col1-bg);
+      border-right: 1px solid var(--divider-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      backdrop-filter: blur(30px);
+    }
+
+    .topbar-sidebar {
+      height: 44px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .traffic-lights {
+      display: flex;
+      gap: 7.5px;
+      align-items: center;
+    }
+
+    .traffic-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      position: relative;
+      box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15);
+    }
+    .traffic-dot.red { background: var(--traffic-red); }
+    .traffic-dot.yellow { background: var(--traffic-yellow); }
+    .traffic-dot.green { background: var(--traffic-green); }
+
+    .btn-textured {
+      width: 36px;
+      height: 25px;
+      border-radius: 6px;
+      background: var(--btn-textured-bg);
+      border: 1px solid var(--btn-textured-border);
+      box-shadow: var(--btn-textured-shadow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .sidebar-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 2px 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .group-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--section-header);
+      padding: 6px 12px 2px 12px;
+    }
+
+    .sidebar-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      margin: 0 4px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .sidebar-row:hover:not(.active) { background: var(--item-hover); }
+    .sidebar-row.active {
+      background: var(--item-active);
+      color: #ffffff !important;
+      font-weight: 500;
+    }
+    .sidebar-row .row-icon { width: 16px; font-size: 13px; display: flex; justify-content: center; color: var(--text-secondary); }
+    .sidebar-row.active .row-icon { color: #ffffff !important; }
+    .sidebar-row .row-title { flex: 1; }
+    .sidebar-row .row-count { font-size: 11px; font-family: monospace; color: var(--text-tertiary); }
+    .sidebar-row.active .row-count { color: rgba(255,255,255,0.85); }
+
+    .sidebar-bottom {
+      height: 36px;
+      padding: 0 14px;
+      border-top: 1px solid var(--divider-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    /* 栏目 2: 笔记卡片列表 (Note List) */
+    .col-notelist {
+      width: 250px;
+      height: 100%;
+      background: var(--col2-bg);
+      border-right: 1px solid var(--divider-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .topbar-notelist {
+      height: 44px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--divider-color);
+      flex-shrink: 0;
+    }
+
+    .search-pill {
+      background: var(--btn-textured-bg);
+      border: 1px solid var(--btn-textured-border);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      width: 140px;
+      outline: none;
+    }
+
+    .cards-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .note-card {
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: background 0.1s ease;
+    }
+    .note-card:hover:not(.active) { background: var(--item-hover); }
+    .note-card.active {
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-border);
+    }
+
+    .note-card-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .note-card.active .note-card-title { color: var(--accent); }
+
+    .note-card-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11.5px;
+    }
+    .note-card-date { color: var(--text-secondary); font-size: 11px; }
+    .note-card-snippet { color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+
+    /* 栏目 3: 正文编辑器 (Note Editor) */
+    .col-editor {
+      flex: 1;
+      height: 100%;
+      background: var(--col3-bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar-editor {
+      height: 44px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      border-bottom: 1px solid var(--divider-color);
+      flex-shrink: 0;
+      gap: 8px;
+    }
+
+    .editor-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 36px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .editor-date {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      text-align: center;
+    }
+
+    .editor-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text-primary);
+      border: none;
+      background: transparent;
+      outline: none;
+    }
+
+    .editor-content {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-primary);
+      border: none;
+      background: transparent;
+      outline: none;
+      resize: none;
+      flex: 1;
+      min-height: 300px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="showcase-header">
+    <div class="showcase-title">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      macOS 原生三栏记事本 (NSSplitViewController)
+      <span class="badge-pill">Glint / Apple Notes 1:1 架构</span>
+    </div>
+    
+    <div class="theme-switch">
+      <button class="theme-btn active" onclick="setTheme('light')">☀️ 浅色 (默认)</button>
+      <button class="theme-btn" onclick="setTheme('dark')">🌙 深色</button>
+    </div>
+  </div>
+
+  <div class="notebook-window">
+    
+    <!-- 栏目 1: 侧边栏 -->
+    <div class="col-sidebar">
+      <div class="topbar-sidebar">
+        <div class="traffic-lights">
+          <div class="traffic-dot red"></div>
+          <div class="traffic-dot yellow"></div>
+          <div class="traffic-dot green"></div>
+        </div>
+        <button class="btn-textured" title="折叠/展开侧边栏">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+        </button>
+      </div>
+
+      <div class="sidebar-list">
+        <div class="sidebar-group">
+          <div class="group-header">快速访问</div>
+          <div class="sidebar-row active">
+            <div class="row-icon">📥</div>
+            <div class="row-title">全部笔记</div>
+            <div class="row-count">8</div>
+          </div>
+          <div class="sidebar-row">
+            <div class="row-icon">✨</div>
+            <div class="row-title">速记灵感</div>
+            <div class="row-count">3</div>
+          </div>
+        </div>
+
+        <div class="sidebar-group">
+          <div class="group-header">分类</div>
+          <div class="sidebar-row">
+            <div class="row-icon">📁</div>
+            <div class="row-title">工作与项目</div>
+            <div class="row-count">4</div>
+          </div>
+          <div class="sidebar-row">
+            <div class="row-icon">📖</div>
+            <div class="row-title">学习笔记</div>
+            <div class="row-count">1</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-bottom">
+        <span>···</span>
+        <span>8 篇笔记</span>
+      </div>
+    </div>
+
+    <!-- 栏目 2: 笔记卡片列表 -->
+    <div class="col-notelist">
+      <div class="topbar-notelist">
+        <input type="text" class="search-pill" placeholder="搜索笔记...">
+        <button class="btn-textured" title="新建笔记">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
+      </div>
+
+      <div class="cards-list">
+        <div class="note-card active" onclick="selectNote(this, 'macOS 原生架构学习笔记', '23:30', 'toolbarStyle = .unified + NSTrackingSeparatorToolbarItem 联动规范...')">
+          <div class="note-card-title">macOS 原生架构学习笔记</div>
+          <div class="note-card-meta">
+            <span class="note-card-date">23:30</span>
+            <span class="note-card-snippet">toolbarStyle = .unified + NSTrackingSeparator...</span>
+          </div>
+        </div>
+
+        <div class="note-card" onclick="selectNote(this, 'Swift 与 AppKit 最佳实践', '昨天', '现代 AppKit 开发中，充分利用系统底层组件...')">
+          <div class="note-card-title">Swift 与 AppKit 最佳实践</div>
+          <div class="note-card-meta">
+            <span class="note-card-date">昨天</span>
+            <span class="note-card-snippet">现代 AppKit 开发中，充分利用系统底层组件...</span>
+          </div>
+        </div>
+
+        <div class="note-card" onclick="selectNote(this, '双语输入法词库演进', '10/1', 'CET-4, IELTS 与专业术语分级词库管理架构...')">
+          <div class="note-card-title">双语输入法词库演进</div>
+          <div class="note-card-meta">
+            <span class="note-card-date">10/1</span>
+            <span class="note-card-snippet">CET-4, IELTS 与专业术语分级词库管理架构...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 栏目 3: 正文编辑器 -->
+    <div class="col-editor">
+      <div class="topbar-editor">
+        <button class="btn-textured" title="分享/导出">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+
+      <div class="editor-body">
+        <div class="editor-date" id="editorDate">最后修改于 今天 23:30</div>
+        <input type="text" class="editor-title" id="editorTitle" value="macOS 原生架构学习笔记">
+        <textarea class="editor-content" id="editorContent"># macOS 原生架构学习笔记
+
+通过深度遵循 Apple 原生 HIG 与成熟架构：
+
+1. **统一工具栏**：toolbarStyle = .unified，红黄绿灯天然内嵌在侧边栏顶端；
+2. **跟踪分割线**：NSTrackingSeparatorToolbarItem 随侧边栏折叠平滑联动；
+3. **1:1 蓝药丸选中**：AppleSidebarRowView 实心纯正蓝 (#007AFF) + 纯白反白；
+4. **多栏联动**：NSSplitViewController 纯 AppKit 流畅性能。</textarea>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function setTheme(mode) {
+      document.body.className = mode === 'dark' ? 'theme-dark' : '';
+      const btns = document.querySelectorAll('.theme-btn');
+      btns.forEach((b, i) => {
+        b.classList.toggle('active', (mode === 'light' && i === 0) || (mode === 'dark' && i === 1));
+      });
+    }
+
+    function selectNote(elem, title, date, snippet) {
+      document.querySelectorAll('.note-card').forEach(c => c.classList.remove('active'));
+      elem.classList.add('active');
+      document.getElementById('editorTitle').value = title;
+      document.getElementById('editorDate').innerText = '最后修改于 ' + date;
+    }
+  </script>
+</body>
+</html>
